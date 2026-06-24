@@ -814,7 +814,17 @@ def _delete_skill(name: str, absorbed_into: Optional[str] = None) -> Dict[str, A
     if unsafe:
         return {"success": False, "error": unsafe}
 
-    shutil.rmtree(skill_dir)
+    try:
+        shutil.rmtree(skill_dir)
+    except PermissionError:
+        return {
+            "success": False,
+            "error": (
+                "Cannot delete read-only skill. This skill appears to be part of the "
+                "base installation or otherwise protected by filesystem permissions, "
+                "so it cannot be removed from this environment."
+            ),
+        }
 
     # Clean up empty category directories (don't remove the skills root itself)
     parent = skill_dir.parent

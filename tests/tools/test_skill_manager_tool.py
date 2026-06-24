@@ -978,6 +978,19 @@ class TestDeleteSkillRmtreeGuard:
         assert result["success"] is True, result
         assert not (tmp_path / "good-skill").exists()
 
+    def test_read_only_skill_permission_error_is_non_retryable(self, tmp_path):
+        """Read-only bundled skills should fail gracefully, not throw from rmtree."""
+        with _skill_dir(tmp_path):
+            _create_skill("readonly-skill", VALID_SKILL_CONTENT)
+            skill_dir = tmp_path / "readonly-skill"
+            with patch("tools.skill_manager_tool.shutil.rmtree", side_effect=PermissionError("denied")):
+                result = _delete_skill("readonly-skill", absorbed_into="")
+
+        assert result["success"] is False
+        assert "read-only skill" in result["error"]
+        assert "cannot be removed" in result["error"]
+        assert skill_dir.exists()
+
     def test_symlinked_skill_dir_refused(self, tmp_path):
         """A skill dir that is a symlink must not be rmtree'd — rmtree would
         otherwise follow it and delete the link target's contents."""
