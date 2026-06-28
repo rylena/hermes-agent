@@ -555,3 +555,47 @@ class TestReasoningStyle:
 
         config = {"display": {"reasoning_style": "SUBTEXT"}}
         assert resolve_display_setting(config, "telegram", "reasoning_style") == "subtext"
+
+
+class TestGatewayStreamingEnabled:
+    """Gateway streaming uses streaming.enabled as the global kill switch."""
+
+    def test_global_disabled_beats_platform_true_default(self):
+        from gateway.config import StreamingConfig
+        from gateway.display_config import resolve_display_setting
+        from gateway.run import _gateway_streaming_enabled
+        from hermes_cli.config import DEFAULT_CONFIG
+
+        config = {
+            **DEFAULT_CONFIG,
+            "streaming": {"enabled": False, "transport": "auto"},
+        }
+        platform_streaming = resolve_display_setting(config, "telegram", "streaming")
+        assert platform_streaming is True
+
+        streaming_config = StreamingConfig(
+            **{**StreamingConfig().__dict__, **config["streaming"]}
+        )
+        assert _gateway_streaming_enabled(streaming_config, platform_streaming) is False
+
+    def test_truth_table(self):
+        from gateway.config import StreamingConfig
+        from gateway.run import _gateway_streaming_enabled
+
+        cases = [
+            (False, "auto", True, False),
+            (False, "auto", False, False),
+            (False, "auto", None, False),
+            (True, "auto", True, True),
+            (True, "auto", False, False),
+            (True, "auto", None, True),
+            (True, "off", True, False),
+            (True, " off ", None, False),
+            (True, "OFF", True, False),
+        ]
+        for enabled, transport, platform_streaming, expected in cases:
+            streaming_config = StreamingConfig(enabled=enabled, transport=transport)
+            assert (
+                _gateway_streaming_enabled(streaming_config, platform_streaming)
+                is expected
+            )

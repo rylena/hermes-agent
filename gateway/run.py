@@ -212,6 +212,27 @@ def _gateway_platform_value(platform: Any) -> str:
     return str(getattr(platform, "value", platform) or "").strip().lower()
 
 
+def _gateway_streaming_enabled(streaming_config: Any, platform_streaming: Any) -> bool:
+    """Resolve the effective gateway streaming toggle for one platform.
+
+    ``streaming.enabled`` is the global master switch. Per-platform
+    ``display.platforms.<platform>.streaming`` values can only opt a platform
+    in or out after that global switch is enabled.
+    """
+    if not bool(getattr(streaming_config, "enabled", False)):
+        return False
+    transport = (
+        str(getattr(streaming_config, "transport", "auto") or "auto")
+        .strip()
+        .lower()
+    )
+    if transport == "off":
+        return False
+    if platform_streaming is None:
+        return True
+    return bool(platform_streaming)
+
+
 def _non_conversational_metadata(
     metadata: Optional[Dict[str, Any]] = None,
     *,
@@ -14880,11 +14901,7 @@ class GatewayRunner(GatewayAuthorizationMixin, GatewayKanbanWatchersMixin, Gatew
         _plat_streaming = resolve_display_setting(
             user_config, platform_key, "streaming"
         )
-        _streaming_enabled = (
-            _scfg.enabled and _scfg.transport != "off"
-            if _plat_streaming is None
-            else bool(_plat_streaming)
-        )
+        _streaming_enabled = _gateway_streaming_enabled(_scfg, _plat_streaming)
 
         _thread_metadata: Optional[Dict[str, Any]] = self._thread_metadata_for_source(source, event_message_id)
 
@@ -16060,11 +16077,7 @@ class GatewayRunner(GatewayAuthorizationMixin, GatewayKanbanWatchersMixin, Gatew
                 user_config, platform_key, "streaming"
             )
             # None = no per-platform override → follow global config
-            _streaming_enabled = (
-                _scfg.enabled and _scfg.transport != "off"
-                if _plat_streaming is None
-                else bool(_plat_streaming)
-            )
+            _streaming_enabled = _gateway_streaming_enabled(_scfg, _plat_streaming)
             _want_stream_deltas = _streaming_enabled
             _want_interim_messages = interim_assistant_messages_enabled
             _want_interim_consumer = _want_interim_messages
